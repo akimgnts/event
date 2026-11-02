@@ -1,3 +1,4 @@
+import {fetchSumup} from './connectors/sumup';
 import {applyConfirmedLinks} from './confirmed-links';
 import {randomUUID,createHash} from 'node:crypto';
 import {session} from './db';
@@ -9,13 +10,15 @@ export async function runSync(provider:string,since='2026-10-01',until=new Date(
 }
 async function syncWithSession(db:Awaited<ReturnType<typeof session>>['db'],provider:string,since:string,until:string) {
  const run=randomUUID();
- const account=provider==='shotgun'?process.env.SHOTGUN_ORGANIZER_ID:provider==='meta'?process.env.META_AD_ACCOUNT_ID:provider==='instagram'?process.env.INSTAGRAM_ACCOUNT_ID:process.env.MANYCHAT_ACCOUNT_ID;
+ const account=provider==='sumup'?process.env.SUMUP_MERCHANT_CODE:provider==='shotgun'?process.env.SHOTGUN_ORGANIZER_ID:provider==='meta'?process.env.META_AD_ACCOUNT_ID:provider==='instagram'?process.env.INSTAGRAM_ACCOUNT_ID:process.env.MANYCHAT_ACCOUNT_ID;
  await db.query('INSERT INTO bronze.runs(id,provider,account_id,status) VALUES($1,$2,$3,$4)',[run,provider,account||'unconfigured','running']);
  let now=new Date().toISOString();let count=0;
  // Collect every page before opening a transaction: an incomplete fetch cannot advance published data.
  try {
   let rows:{kind:string;id:string;payload:Row}[]=[];
-  if(provider==='shotgun'){
+  if(provider==='sumup'){
+   rows=(await fetchSumup()).map(p=>({kind:'sumup_transaction',id:String(p.id),payload:p}));
+  }else if(provider==='shotgun'){
    const result=await fetchShotgun();
    rows=[...result.events.map(e=>({kind:'event',id:String(e.id),payload:e})),...result.tickets.map(t=>({kind:'ticket',id:String(t.ticket_id),payload:t}))];
   }else if(provider==='meta'){
@@ -40,6 +43,7 @@ async function syncWithSession(db:Awaited<ReturnType<typeof session>>['db'],prov
    for(const r of rows){
     const json=JSON.stringify(r.payload);await db.query('INSERT INTO bronze.records(run_id,kind,external_id,payload,checksum,observed_at) VALUES($1,$2,$3,$4,$5,$6)',[run,r.kind,r.id,json,createHash('sha256').update(json).digest('hex'),now]);count++;
     const p=r.payload;
+    if(r.kind==='sumup_transaction')await db.query(`INSERT INTO silver.sumup_transactions(merchant_code,transaction_id,transaction_code,amount,currency,occurred_at,status,type,payment_type,refunded_amount,synced_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT(merchant_code,transaction_id) DO UPDATE SET transaction_code=excluded.transaction_code,amount=excluded.amount,currency=excluded.currency,occurred_at=excluded.occurred_at,status=excluded.status,type=excluded.type,payment_type=excluded.payment_type,refunded_amount=excluded.refunded_amount,synced_at=excluded.synced_at`,[account,r.id,p.transaction_code??null,p.amount,p.currency,p.timestamp,p.status,p.type,p.payment_type??null,p.refunded_amount??null,now]);
     if(r.kind==='event'){
      if(!p.id||typeof p.name!=='string')throw new Error('INVALID_EVENT_SCHEMA');
      const status=p.cancelledAt?'canceled':!p.publishedAt?'draft':String(p.endTime)<now?'past':'published';

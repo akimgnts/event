@@ -14,7 +14,7 @@ async function main(){
    const result=await client.query('SELECT pg_try_advisory_lock(730012026) AS locked');locked=result.rows[0].locked;
    if(locked){
     console.log(JSON.stringify({credentials:await checkCredentials()}));
-    const sources=[['shotgun','SHOTGUN_API_TOKEN'],['meta','META_ACCESS_TOKEN'],['instagram','INSTAGRAM_ACCESS_TOKEN']];
+    const sources=[['sumup','SUMUP_ACCESS_TOKEN'],['shotgun','SHOTGUN_API_TOKEN'],['meta','META_ACCESS_TOKEN'],['instagram','INSTAGRAM_ACCESS_TOKEN']];
     for(const [source,key] of sources){if(stop.signal.aborted)break;if(!process.env[key])continue;const r=await runSync(source,process.env.SYNC_SINCE,process.env.SYNC_UNTIL);console.log(JSON.stringify(r));}
    }
   }catch{console.error('WORKER_CYCLE_FAILED');}

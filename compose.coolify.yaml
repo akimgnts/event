@@ -30,6 +30,8 @@ services:
       INSTAGRAM_ACCOUNT_ID: ${INSTAGRAM_ACCOUNT_ID}
       INSTAGRAM_ACCESS_TOKEN: ${INSTAGRAM_ACCESS_TOKEN}
       META_CORE_ACCESS_TOKEN: ${META_CORE_ACCESS_TOKEN}
+      SUMUP_ACCESS_TOKEN: ${SUMUP_ACCESS_TOKEN:-}
+      SUMUP_MERCHANT_CODE: ${SUMUP_MERCHANT_CODE:-}
       SYNC_SINCE: '2026-10-01'
     command: [sh, -c, 'node --import tsx scripts/migrate.ts && exec node node_modules/next/dist/bin/next start -H 0.0.0.0']
     depends_on:
