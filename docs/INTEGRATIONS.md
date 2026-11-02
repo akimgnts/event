@@ -21,4 +21,4 @@ Use authorized APIs/webhooks and consent-compliant data only. Avoid cloning rest
 UTM tags identify campaign context, not necessarily confirmed ticket sales. Report attribution coverage and unknown sources. Never equate visits with unique people.
 
 ## Architecture decisions
-V1 is a demo with no live connectors. Prioritize CSV import and reliable KPI definitions before OAuth and autonomous actions.
+Shotgun Tickets and Events are live-validated. Meta/Instagram/ManyChat remain blocked or unvalidated; see CONNECT.md.

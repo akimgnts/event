@@ -1,8 +1,4 @@
-import { NextResponse } from "next/server";
-import { integrations } from "@/lib/integrations";
-export async function GET() {
-  return NextResponse.json({
-    integrations: integrations.map(({id,label,purpose,status,strategy,requirements}) => ({id,label,purpose,status,strategy,requirements})),
-    note: "Registry only. No provider authorization has been granted to this application."
-  }, {headers: {"Cache-Control":"no-store"}});
-}
+import {NextResponse} from 'next/server';
+import {dashboardData} from '@/lib/dashboard';
+export const dynamic='force-dynamic';
+export async function GET(){try{const d=await dashboardData();return NextResponse.json({latestAttempts:d.runs,lastSuccessful:d.successful},{headers:{'Cache-Control':'no-store'}})}catch{return NextResponse.json({status:'unavailable'},{status:503})}}

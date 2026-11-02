@@ -12,7 +12,7 @@ const safeFields = [
 
 export async function GET(request: NextRequest) {
   // Do not expose this route on a public deployment without organizer authentication.
-  if (process.env.NODE_ENV === "production" && process.env.EVENT_SIGNAL_INTERNAL_API_KEY !== request.headers.get("x-event-signal-key")) {
+  if (process.env.NODE_ENV === "production" && (!process.env.EVENT_SIGNAL_INTERNAL_API_KEY || process.env.EVENT_SIGNAL_INTERNAL_API_KEY !== request.headers.get("x-event-signal-key"))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const token = process.env.SHOTGUN_API_TOKEN;

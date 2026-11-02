@@ -6,18 +6,26 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "sync": "node --env-file=.env.local --import tsx scripts/sync.ts",
+    "migrate": "node --env-file=.env.local --import tsx scripts/migrate.ts",
+    "verify": "node --env-file=.env.local --import tsx scripts/verify.ts"
   },
   "dependencies": {
+    "@electric-sql/pglite": "^0.5.14",
+    "lucide-react": "^0.468.0",
     "next": "^15.3.0",
+    "pg": "^8.23.1",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "lucide-react": "^0.468.0"
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
-    "typescript": "^5.7.0",
     "@types/node": "^22.0.0",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0"
+    "@types/react-dom": "^19.0.0",
+    "tsx": "^4.23.15",
+    "typescript": "^5.7.0"
   }
 }
