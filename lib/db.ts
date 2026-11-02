@@ -18,3 +18,4 @@ export async function session(){
  if(db instanceof Pool){const client=await db.connect();return {db:client as unknown as DB,release:()=>client.release()};}
  return {db,release:()=>{}};
 }
+export async function closeDatabase(){const db=await database();if(db instanceof Pool)await db.end();else await (db as unknown as PGlite).close();delete shared.eventSignalDatabase;}
