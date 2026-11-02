@@ -30,7 +30,7 @@ In development only, when DATABASE_URL is absent, PGlite runs an embedded Postgr
 
 The Events API returned the past event; upcoming inventory was empty. Draft 615336 was observed in Smartboard separately and imported as `smartboard_ui`, with no sales metrics inferred. API inventory is not claimed to include all drafts. Physical capacity and visits are unknown. Tier quantities and leftTicketsCount are not interpreted as room capacity.
 
-Meta account identified, but developer registration/terms block token creation. Instagram media reader is implemented but not live-validated; Insights are not implemented. ManyChat API requires an eligible paid plan; no subscription was changed. Its connector only probes account metadata, not automation performance. Current account/automation UI observations are not presented as API results.
+Meta app 1106943715542061 created; ads_read token validated over HTTP 200. First extraction: one campaign with delivery, 9 campaign/day rows, EUR 17.00 spend, 5,887 impressions and 545 all-clicks. This is not link-click or ticket-purchase attribution. Instagram media reader is implemented but not live-validated; Insights are not implemented. ManyChat API requires an eligible paid plan; no subscription was changed. Its connector only probes account metadata, not automation performance. Current account/automation UI observations are not presented as API results.
 
 ## Schema and verification
 
