@@ -49,3 +49,7 @@ node --env-file=.env.local scripts/smoke.mjs
 Local private data and credentials are excluded from Git. No public hosting or modification of the user's separate Mac localhost project is performed by cloning into this execution workspace.
 
 Portable private snapshots: `scripts/export-data.ts` exports sanitized warehouse tables as JSON, `scripts/restore-data.ts` restores them after applying the migration. Neither contains API tokens. Close the embedded database cleanly before copying data files. The CLI scripts close it explicitly. For a durable live service, use a managed PostgreSQL server.
+
+## Production runtime
+
+See [deployment instructions](docs/PRODUCTION.md) for the private HTTPS / PostgreSQL / scheduled worker stack. It is prepared but not hosted yet. `npm run credentials:check` records verified expiry metadata without storing tokens in the database.

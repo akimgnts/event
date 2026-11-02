@@ -10,7 +10,10 @@
     "test": "node --import tsx --test tests/*.test.ts",
     "sync": "node --env-file=.env.local --import tsx scripts/sync.ts",
     "migrate": "node --env-file=.env.local --import tsx scripts/migrate.ts",
-    "verify": "node --env-file=.env.local --import tsx scripts/verify.ts"
+    "verify": "node --env-file=.env.local --import tsx scripts/verify.ts",
+    "credentials:check": "node --env-file=.env.local --import tsx scripts/check-credentials.ts",
+    "worker": "node --env-file=.env.local --import tsx scripts/worker.ts",
+    "production:prepare": "node scripts/prepare-production.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.14",

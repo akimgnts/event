@@ -24,3 +24,7 @@ App 1106943715542061 created. Existing token captured privately from authorized 
 ## Update: Instagram and expanded Core access verified
 
 Configuration 2364807190941086 (Event Signal Core) is authorized for the existing YEVA Page 1361646817032232, Instagram yeva.club 17841429562986531, and associated business 3321547264536362. All ten configured scopes plus public_profile are granted. Profile, 4 media objects and lifetime reach/views/total_interactions Insights were fetched successfully, stored in sanitized Bronze and normalized Silver, and displayed in the private dashboard. Comment/conversation read probes returned HTTP 200 using fields=id and limit=1; contents and IDs were not saved. Write permissions are granted, but no send/publish/moderation/advertising writes are implemented or tested. ManyChat remains active. Token expiry/refresh and production secret injection are still deployment work; no permanent token validity is assumed.
+
+## Update: production preparation and credential expiry
+
+See PRODUCTION.md. HTTPS/private-access, PostgreSQL 17, sequential scheduled worker and daily backups are packaged but not deployed: no hosting destination is connected. Live debug_token checks show the existing Meta token is valid until 2027-01-01T14:46:45Z with all ten scopes. Instagram/Core now use it instead of the credential expiring on 2026-11-02. Fresh Shotgun, Meta and Instagram syncs succeeded. Token metadata is checked and shown in the dashboard; reconnect remains necessary at expiry/revocation. No automatic Facebook-token renewal is promised.
