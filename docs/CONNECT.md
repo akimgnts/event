@@ -1,25 +1,30 @@
-# Connect Event Signal (read-only)
+# Connection status and next actions
 
-This project does not inherit browser login cookies. Server-side API credentials must be authorized independently.
+See README.md for the verified extract and db/001_pipeline.sql for the applied schema.
 
-## Meta Ads
-1. Use a Meta developer application with Marketing API access and `ads_read` permission.
-2. Obtain an authorized token for the relevant ad account. Store it in `.env.local` as `META_ACCESS_TOKEN`; never commit it.
-3. Set `META_AD_ACCOUNT_ID` to the ad account ID.
-4. Run `npm run dev` and request `/api/integrations/meta/insights?since=2026-10-01&until=2026-10-31`.
-5. This endpoint is read-only. It returns campaign-level results; paging must be implemented before full historical sync. Restrict this endpoint behind organizer authentication **before deploying publicly**, since campaign data is private.
+- Shotgun: existing organizer token retrieved from authorized Settings → Integrations → Shotgun APIs, saved privately. Tickets use a Bearer header. Official Events API requires `key` in the query; requests, URLs and provider auth objects are never logged or persisted. Both official endpoints tested successfully.
+- Meta: account exists; developer registration is not completed. User must accept Meta Platform Terms and Developer Policies before an application and ads_read token can be created. No campaign/budget has been changed. Token creation or broader access must be approved at the actual access-grant step.
+- Instagram: requires a developer application and authorized professional account. The implemented reader covers media metadata/counts, not Insights. Request only the scopes required for the chosen login route. No messaging or publishing scopes needed for analytics.
+- ManyChat: Settings → API explicitly says Pro required. No trial or purchase initiated. Existing free-plan automations remain unchanged. The public API getInfo probe does not imply automation performance data is available.
 
-## ManyChat
-1. Check whether your ManyChat plan includes API access. The browser account currently shows FREE; API access may require an upgrade.
-2. If authorized, generate a token in ManyChat settings and store it only in `.env.local` as `MANYCHAT_API_TOKEN`.
-3. Request `/api/integrations/manychat` to validate connection.
-4. Do not expose the endpoint publicly before authentication and access controls are implemented.
+Credentials must be injected into the backend independently of Chrome login. `.env.local` is chmod 0600, ignored by Git. No secrets are included in the data export or repository.
 
-## Shotgun
-An authenticated organizer Smartboard was observed at `https://smartboard.shotgun.live/fr/events/615336` for Trap Session #2. No Shotgun API credential or supported export endpoint has been verified. Use an authorized organizer export as first ingestion path; do not scrape authenticated private endpoints.
+Do not publicly deploy without PostgreSQL, private HTTPS access, strong internal key, backups and appropriate secret injection. Production fails closed without DATABASE_URL/key.
 
-## Instagram and YEVA website
-Instagram requires supported Meta permissions and eligible professional account access. For yeva.club, add consent-aware first-party event tracking after confirming the site code and deployment setup.
+## Update: developer registration completed
 
-## Security
-These are integration scaffolds, **not completed live connections**. Never paste tokens into chat, commit secrets, or use production API endpoints without access controls. All remote actions remain read-only.
+Developer account registration is now completed. A new application creation form is prepared with name Event Signal YEVA, business akimgnts, advertising-performance and Instagram use cases. The final Create Application button explicitly accepts platform/developer terms again; it has not been submitted. No app ID or Meta token exists yet.
+
+ManyChat official automation Insights can be checked without paid API: comment automation shows 6 sends, 3 clicks, 50% CTR; story automation 1 send, 1 click, 100% CTR. UI observations are stored separately with timestamps and links, never advertised as automatic API synchronization. Replies after a DM remain unknown. The inbox shows 19 chats, a workspace total that is not an event conversion metric; no chat names/content are imported.
+
+## Update: Meta Ads operational
+
+App 1106943715542061 created. Existing token captured privately from authorized Meta interface and saved only in chmod-0600 ignored backend configuration. GET me/permissions confirms ads_read and public_profile only; no ads_management. Ad account read returns HTTP 200, currency EUR, timezone Europe/Paris. Campaign/day sync succeeds for 2026-10-01 through extraction date: 9 delivery rows, one campaign, EUR 17.00 spend, 5,887 impressions, 545 all-clicks. Dates with delivered rows span October 14–23. Other/draft campaigns may have no Insights rows; this extract is not a campaign inventory. Instagram is still disconnected because this token has no Instagram/Page scopes. No advertising settings changed.
+
+## Update: Instagram and expanded Core access verified
+
+Configuration 2364807190941086 (Event Signal Core) is authorized for the existing YEVA Page 1361646817032232, Instagram yeva.club 17841429562986531, and associated business 3321547264536362. All ten configured scopes plus public_profile are granted. Profile, 4 media objects and lifetime reach/views/total_interactions Insights were fetched successfully, stored in sanitized Bronze and normalized Silver, and displayed in the private dashboard. Comment/conversation read probes returned HTTP 200 using fields=id and limit=1; contents and IDs were not saved. Write permissions are granted, but no send/publish/moderation/advertising writes are implemented or tested. ManyChat remains active. Token expiry/refresh and production secret injection are still deployment work; no permanent token validity is assumed.
+
+## Update: production preparation and credential expiry
+
+See PRODUCTION.md. HTTPS/private-access, PostgreSQL 17, sequential scheduled worker and daily backups are packaged but not deployed: no hosting destination is connected. Live debug_token checks show the existing Meta token is valid until 2027-01-01T14:46:45Z with all ten scopes. Instagram/Core now use it instead of the credential expiring on 2026-11-02. Fresh Shotgun, Meta and Instagram syncs succeeded. Token metadata is checked and shown in the dashboard; reconnect remains necessary at expiry/revocation. No automatic Facebook-token renewal is promised.

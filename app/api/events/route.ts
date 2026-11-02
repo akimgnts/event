@@ -1,3 +1,4 @@
-import {NextResponse} from "next/server";
-import {knownEvents,emptySnapshot} from "@/lib/event-model";
-export async function GET(){return NextResponse.json({organizer:{id:"yeva",name:"YEVA",timezone:"Europe/Paris"},events:knownEvents.map(emptySnapshot),discovery:{complete:false,message:"Inventaire partiel: seul un événement a été observé dans Shotgun. L'API organisateur n'est pas encore authentifiée."}},{headers:{"Cache-Control":"no-store"}})}
+import {NextResponse} from 'next/server';
+import {dashboardData} from '@/lib/dashboard';
+export const dynamic='force-dynamic';
+export async function GET(){try{return NextResponse.json(await dashboardData(),{headers:{'Cache-Control':'no-store'}})}catch{return NextResponse.json({status:'unavailable',message:'Base indisponible ou migration requise'},{status:503})}}

@@ -1,0 +1,80 @@
+name: yeva
+x-app: &app
+  image: event-signal:local
+  build: .
+  secrets: [runtime_env]
+  init: true
+  restart: unless-stopped
+  depends_on:
+    postgres:
+      condition: service_healthy
+services:
+  postgres:
+    image: postgres:17-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: yeva
+      POSTGRES_DB: yeva
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+    secrets: [db_password]
+    volumes: [postgres_data:/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U yeva -d yeva']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+  migrate:
+    <<: *app
+    restart: 'no'
+    command: [node, deploy/launch.mjs, --import, tsx, scripts/migrate.ts]
+  web:
+    <<: *app
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: [CMD, node, --env-file=/run/secrets/runtime_env, deploy/healthcheck.mjs]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+  worker:
+    <<: *app
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    command: [node, deploy/launch.mjs, --import, tsx, scripts/worker.ts]
+  proxy:
+    image: caddy:2
+    restart: unless-stopped
+    environment:
+      YEVA_DOMAIN: ${YEVA_DOMAIN:?Set YEVA_DOMAIN to your DNS hostname}
+    ports: ['80:80', '443:443']
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [web]
+  backup:
+    image: postgres:17-bookworm
+    restart: unless-stopped
+    environment:
+      PGHOST: postgres
+      PGUSER: yeva
+      PGDATABASE: yeva
+    secrets: [db_password]
+    volumes:
+      - ./deploy/backup.sh:/backup.sh:ro
+      - ./.production/backups:/backups
+    entrypoint: [sh, /backup.sh]
+    depends_on:
+      postgres:
+        condition: service_healthy
+secrets:
+  runtime_env:
+    file: ./.production/runtime.env
+  db_password:
+    file: ./.production/db_password
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:

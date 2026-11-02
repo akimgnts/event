@@ -5,6 +5,6 @@ export interface EventRecord { id:string; organizerId:string; name:string; start
 export interface SourceEvidence { source:SourceName; state:SourceStatus; lastSyncAt:string|null; recordCount:number|null; message:string }
 export interface MetricValue { value:number|null; unit:"tickets"|"EUR"|"%"|"visits"; provenance:string|null; asOf:string|null; note:string }
 export interface EventSnapshot { event:EventRecord; metrics:{tickets:MetricValue;revenue:MetricValue;fillRate:MetricValue;visits:MetricValue}; sources:SourceEvidence[] }
-export const knownEvents:EventRecord[]=[{id:"615336",organizerId:"yeva",name:"TRAP SESSION #2 – Back to Back",startAt:"2026-11-21T20:30:00+01:00",endAt:"2026-11-21T23:00:00+01:00",status:"draft",capacity:null,source:"shotgun"}];
+export const knownEvents:EventRecord[]=[];
 export function emptyMetric(unit:MetricValue["unit"],note:string):MetricValue{return {value:null,unit,provenance:null,asOf:null,note}}
 export function emptySnapshot(event:EventRecord):EventSnapshot{return {event,metrics:{tickets:emptyMetric("tickets","Aucune vente vérifiée via API"),revenue:emptyMetric("EUR","Montants non vérifiés"),fillRate:emptyMetric("%","Capacité et ventes non vérifiées"),visits:emptyMetric("visits","Visites non vérifiées")},sources:(["shotgun","meta","instagram","manychat","website"] as SourceName[]).map(source=>({source,state:"not_connected",lastSyncAt:null,recordCount:null,message:"Aucune synchronisation authentifiée confirmée"}))}}

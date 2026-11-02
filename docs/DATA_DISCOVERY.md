@@ -1,3 +1,7 @@
+# Historical discovery notes
+
+Superseded by README.md and OFFICIAL_API_RESEARCH.md for verified status as of 2026-11-02. The content below records pre-connection assumptions.
+
 # Event Signal — Data discovery before dashboard design
 
 ## Architecture decision
