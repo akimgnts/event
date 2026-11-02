@@ -20,6 +20,17 @@ export async function fetchMeta(since:string,until:string){
 export async function fetchInstagram(){
  const id=process.env.INSTAGRAM_ACCOUNT_ID,token=process.env.INSTAGRAM_ACCESS_TOKEN;
  if(!id||!token||!/^\d+$/.test(id))throw new Error('INSTAGRAM_NOT_CONFIGURED');
- const data=await graphPages(`${id}/media`,{fields:'id,media_type,timestamp,like_count,comments_count',limit:'100'},token);
- return {account:id,data};
+ const version=process.env.META_GRAPH_VERSION||'v26.0';if(!/^v\d+\.\d+$/.test(version))throw new Error('INVALID_GRAPH_VERSION');
+ const profile=await getJSON(new URL(`https://graph.facebook.com/${version}/${id}?fields=id,username,followers_count,media_count`),token);
+ if(String(profile.id)!==id)throw new Error('INSTAGRAM_ACCOUNT_MISMATCH');
+ const data=await graphPages(`${id}/media`,{fields:'id,media_type,timestamp,like_count,comments_count,permalink',limit:'100'},token);
+ const enriched:Row[]=[];
+ for(const m of data){
+  const url=new URL(`https://graph.facebook.com/${version}/${m.id}/insights`);url.searchParams.set('metric','reach,views,total_interactions');
+  const metrics=requireArray(await getJSON(url,token));
+  const insights:Record<string,number|null>={reach:null,views:null,total_interactions:null};
+  for(const metric of metrics){const name=String(metric.name);if(name in insights){const values=metric.values as {value:unknown}[]|undefined;const v=values?.[0]?.value;if(typeof v==='number'&&Number.isFinite(v)&&v>=0)insights[name]=v;}}
+  enriched.push({...m,insights});
+ }
+ return {account:id,profile:pick(profile,['id','username','followers_count','media_count']),data:enriched};
 }

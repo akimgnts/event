@@ -21,7 +21,7 @@ async function syncWithSession(db:Awaited<ReturnType<typeof session>>['db'],prov
    const result=await fetchMeta(since,until);
    rows=result.data.map(r=>({kind:'campaign_daily',id:`${r.campaign_id}:${r.date_start}`,payload:{...r,currency:result.currency}}));
   }else if(provider==='instagram'){
-   const result=await fetchInstagram();rows=result.data.map(r=>({kind:'media',id:String(r.id),payload:r}));
+   const result=await fetchInstagram();rows=[{kind:'instagram_profile',id:result.account,payload:result.profile},...result.data.map(r=>({kind:'media',id:String(r.id),payload:r}))];
   }else if(provider==='manychat'){
    const token=process.env.MANYCHAT_API_TOKEN;if(!token)throw new Error('MANYCHAT_NOT_CONFIGURED');
    const j=await getJSON(new URL('https://api.manychat.com/fb/page/getInfo'),token);
@@ -45,6 +45,14 @@ async function syncWithSession(db:Awaited<ReturnType<typeof session>>['db'],prov
      validateTicket(p);
      await db.query(`INSERT INTO silver.events(organizer_id,event_id,name,status,source,synced_at) VALUES($1,$2,$3,'unknown','shotgun_tickets_api',$4) ON CONFLICT DO NOTHING`,[account,String(p.event_id),String(p.event_name||p.event_id),now]);
      await db.query(`INSERT INTO silver.tickets(organizer_id,ticket_id,event_id,status,channel,price_cents,organizer_fee_cents,user_fee_cents,currency,order_id,ordered_at_raw,sale_day,scanned,canceled,utm_source,utm_medium,synced_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) ON CONFLICT(organizer_id,ticket_id) DO UPDATE SET status=excluded.status,channel=excluded.channel,price_cents=excluded.price_cents,organizer_fee_cents=excluded.organizer_fee_cents,user_fee_cents=excluded.user_fee_cents,currency=excluded.currency,order_id=excluded.order_id,ordered_at_raw=excluded.ordered_at_raw,sale_day=excluded.sale_day,scanned=excluded.scanned,canceled=excluded.canceled,utm_source=excluded.utm_source,utm_medium=excluded.utm_medium,synced_at=excluded.synced_at`,[account,r.id,String(p.event_id),p.ticket_status,p.deal_channel,p.deal_price,p.deal_service_fee??null,p.deal_user_service_fee??null,String(p.currency).toUpperCase(),String(p.order_id),p.ordered_at,String(p.ordered_at).slice(0,10),Boolean(p.ticket_scanned_at),Boolean(p.ticket_canceled_at),p.utm_source??null,p.utm_medium??null,now]);
+    }
+    if(r.kind==='instagram_profile'){
+     await db.query(`INSERT INTO silver.instagram_accounts VALUES($1,$2,$3,$4,$5) ON CONFLICT(account_id) DO UPDATE SET username=excluded.username,followers_count=excluded.followers_count,media_count=excluded.media_count,synced_at=excluded.synced_at`,[account,p.username,p.followers_count??null,p.media_count??null,now]);
+    }
+    if(r.kind==='media'){
+     const metrics=p.insights as Record<string,number|null>;
+     if(!p.id||!p.timestamp||!p.media_type||!metrics)throw new Error('INVALID_INSTAGRAM_MEDIA');
+     await db.query(`INSERT INTO silver.instagram_media VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT(account_id,media_id) DO UPDATE SET media_type=excluded.media_type,published_at=excluded.published_at,permalink=excluded.permalink,likes=excluded.likes,comments=excluded.comments,reach=excluded.reach,views=excluded.views,interactions=excluded.interactions,synced_at=excluded.synced_at`,[account,r.id,p.media_type,p.timestamp,p.permalink??null,p.like_count??null,p.comments_count??null,metrics.reach,metrics.views,metrics.total_interactions,now]);
     }
     if(r.kind==='campaign_daily'){
      if(!p.campaign_id||!p.currency||!Number.isFinite(Number(p.spend))||!Number.isFinite(Number(p.impressions))||!Number.isFinite(Number(p.clicks)))throw new Error('INVALID_META_SCHEMA');
