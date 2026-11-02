@@ -8,6 +8,7 @@ import {hashPassword,checkPassword} from '../lib/password';
 import {signToken,verifyToken} from '../lib/session-token';
 import {database,closeDatabase} from '../lib/db';
 import {POST} from '../app/api/auth/login/route';
+import {GET as bootstrap} from '../app/api/auth/bootstrap/route';
 test('password hashes are salted and tokens reject expiry, tampering and purpose confusion',async()=>{
  process.env.EVENT_SIGNAL_INTERNAL_API_KEY='test-private-key';
  const a=hashPassword('test-password-long');assert.notEqual(a,hashPassword('test-password-long'));assert(checkPassword('test-password-long',a));assert(!checkPassword('wrong',a));
@@ -20,6 +21,7 @@ test('first password requires private setup, cannot be overwritten, sessions and
  const request=(password:string,cookie='',origin='https://yeva.test')=>new NextRequest('https://yeva.test/api/auth/login',{method:'POST',headers:{host:'yeva.test',origin,cookie,'content-type':'application/json'},body:JSON.stringify({password,confirmation:password})});
  assert.equal((await POST(request('first-password-long'))).status,403);
  const cookie='yeva_setup='+await signToken('setup',Date.now()+60000);
+ const boot=await bootstrap(new NextRequest('http://0.0.0.0:3000/api/auth/bootstrap?ticket='+cookie.slice(11)));assert.equal(boot.headers.get('location'),'/login');assert(boot.cookies.get('yeva_setup'));
  assert.equal((await POST(request('first-password-long',cookie,'https://evil.test'))).status,403);
  const first=await POST(request('first-password-long',cookie));assert.equal(first.status,200);assert(first.cookies.get('yeva_session'));
  assert.equal((await POST(request('second-password-long',cookie))).status,401);
