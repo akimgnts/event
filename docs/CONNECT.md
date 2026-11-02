@@ -10,3 +10,9 @@ See README.md for the verified extract and db/001_pipeline.sql for the applied s
 Credentials must be injected into the backend independently of Chrome login. `.env.local` is chmod 0600, ignored by Git. No secrets are included in the data export or repository.
 
 Do not publicly deploy without PostgreSQL, private HTTPS access, strong internal key, backups and appropriate secret injection. Production fails closed without DATABASE_URL/key.
+
+## Update: developer registration completed
+
+Developer account registration is now completed. A new application creation form is prepared with name Event Signal YEVA, business akimgnts, advertising-performance and Instagram use cases. The final Create Application button explicitly accepts platform/developer terms again; it has not been submitted. No app ID or Meta token exists yet.
+
+ManyChat official automation Insights can be checked without paid API: comment automation shows 6 sends, 3 clicks, 50% CTR; story automation 1 send, 1 click, 100% CTR. UI observations are stored separately with timestamps and links, never advertised as automatic API synchronization. Replies after a DM remain unknown. The inbox shows 19 chats, a workspace total that is not an event conversion metric; no chat names/content are imported.

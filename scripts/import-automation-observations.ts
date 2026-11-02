@@ -1,0 +1,4 @@
+import {database,closeDatabase} from '../lib/db';
+import {readFile} from 'node:fs/promises';
+async function main(){const rows=JSON.parse(await readFile(process.argv[2],'utf8'));const db=await database();for(const r of rows){if(!r.accountId||!r.flowId||!r.name||!r.observedAt||new URL(r.url).origin!=='https://app.manychat.com'||![r.sends,r.clicks].every(n=>Number.isSafeInteger(n)&&n>=0)||!Number.isFinite(r.ctr)||r.ctr<0||r.ctr>100)throw Error('Invalid observation');await db.query(`INSERT INTO silver.automation_observations(account_id,flow_id,flow_name,event_id,sends,clicks,ctr,replies,source_url,observed_at) VALUES($1,$2,$3,$4,$5,$6,$7,NULL,$8,$9) ON CONFLICT DO NOTHING`,[r.accountId,r.flowId,r.name,r.eventId||null,r.sends,r.clicks,r.ctr,r.url,r.observedAt]);}await closeDatabase();console.log('ManyChat UI observations imported; replies remain unknown');}
+main().then(()=>process.exit(0)).catch(()=>{console.error('Observation import failed');process.exit(1)});
