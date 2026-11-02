@@ -53,3 +53,7 @@ Portable private snapshots: `scripts/export-data.ts` exports sanitized warehouse
 ## Production runtime
 
 See [deployment instructions](docs/PRODUCTION.md) for the private HTTPS / PostgreSQL / scheduled worker stack. It is prepared but not hosted yet. `npm run credentials:check` records verified expiry metadata without storing tokens in the database.
+
+## Cockpit analytics v2
+
+The private app now includes event-scoped navigation, ticket tiers/fees, enriched Instagram watch statistics, ad-level click/video curves, persistent audited associations and a bounded analytical question assistant. See [ANALYTICS.md](docs/ANALYTICS.md) for KPI definitions and limitations. The assistant uses predefined analyses, not an external LLM. Source operations remain read-only.

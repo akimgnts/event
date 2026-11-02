@@ -1,5 +1,5 @@
 import {getJSON,requireArray,pick,Row} from './http';
-export const ticketFields=['ticket_id','ticket_updated_at','ticket_status','ticket_canceled_at','ticket_scanned_at','deal_id','deal_title','deal_channel','deal_price','deal_service_fee','deal_user_service_fee','currency','order_id','ordered_at','utm_source','utm_medium','event_id','event_name','event_start_time','event_end_time','event_published_at'] as const;
+export const ticketFields=['ticket_id','ticket_updated_at','ticket_status','ticket_canceled_at','ticket_scanned_at','deal_vat_rate','deal_producer_cost','payment_method','deal_id','deal_title','deal_channel','deal_price','deal_service_fee','deal_user_service_fee','currency','order_id','ordered_at','utm_source','utm_medium','event_id','event_name','event_start_time','event_end_time','event_published_at'] as const;
 export function safeTicket(row:Row) {return pick(row,ticketFields);}
 export function validateTicket(t:Row) {
   const states=['valid','resold','refunded','canceled','payment_plan_pending','pending_approval','rejected'];
