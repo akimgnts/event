@@ -1,0 +1,54 @@
+services:
+  postgres:
+    image: postgres:17-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: yeva
+      POSTGRES_DB: yeva
+      POSTGRES_PASSWORD: ${SERVICE_PASSWORD_POSTGRES}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U yeva -d yeva']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+  web:
+    build: .
+    image: event-signal-yeva:latest
+    restart: unless-stopped
+    environment: &runtime
+      NODE_ENV: production
+      DATABASE_URL: postgresql://yeva:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/yeva
+      EVENT_SIGNAL_INTERNAL_API_KEY: ${EVENT_SIGNAL_INTERNAL_API_KEY}
+      SHOTGUN_ORGANIZER_ID: ${SHOTGUN_ORGANIZER_ID}
+      SHOTGUN_API_TOKEN: ${SHOTGUN_API_TOKEN}
+      META_GRAPH_VERSION: v26.0
+      META_AD_ACCOUNT_ID: ${META_AD_ACCOUNT_ID}
+      META_APP_ID: ${META_APP_ID}
+      META_ACCESS_TOKEN: ${META_ACCESS_TOKEN}
+      INSTAGRAM_ACCOUNT_ID: ${INSTAGRAM_ACCOUNT_ID}
+      INSTAGRAM_ACCESS_TOKEN: ${INSTAGRAM_ACCESS_TOKEN}
+      META_CORE_ACCESS_TOKEN: ${META_CORE_ACCESS_TOKEN}
+      SYNC_SINCE: '2026-10-01'
+    command: [sh, -c, 'node --import tsx scripts/migrate.ts && exec node node_modules/next/dist/bin/next start -H 0.0.0.0']
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, node, deploy/healthcheck.mjs]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+  worker:
+    build: .
+    image: event-signal-yeva:latest
+    restart: unless-stopped
+    environment: *runtime
+    command: [node, --import, tsx, scripts/worker.ts]
+    depends_on:
+      web:
+        condition: service_healthy
+volumes:
+  postgres-data:
