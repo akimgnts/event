@@ -60,9 +60,9 @@ export default function Cockpit({data:d}:{data:Row}){
   const iso=(v:unknown)=>{if(!v)return '';const s=String(v);return s.length>=10?s.slice(0,10):''};
   const label=(day:string)=>{try{return new Date(day+'T12:00:00').toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short'})}catch{return day}};
   const saleRows=d.eventDaily.filter((x:Row)=>eventId==='all'||x.event_id===eventId);
-  const sales=new Map<string,number>();saleRows.forEach((x:Row)=>{const k=iso(x.sale_day||x.day||x.date);if(k)sales.set(k,(sales.get(k)||0)+Number(x.valid_tickets||x.tickets||0)});
+  const sales=new Map<string,number>();saleRows.forEach((x:Row)=>{const k=iso(x.sale_day||x.day||x.date);if(k)sales.set(k,(sales.get(k)||0)+Number(x.valid_tickets||x.tickets||0));});
   const content=new Map<string,Row[]>();media.forEach((m:Row)=>{const k=iso(m.timestamp||m.published_at||m.created_time||m.media_created_at||m.created_at);if(k)content.set(k,[...(content.get(k)||[]),m])});
-  const spend=new Map<string,number>();d.spend.filter((x:Row)=>eventId==='all'||x.event_id===eventId).forEach((x:Row)=>{const k=iso(x.day||x.spend_day||x.date||x.date_start);if(k)spend.set(k,(spend.get(k)||0)+Number(x.spend||0)});
+  const spend=new Map<string,number>();d.spend.filter((x:Row)=>eventId==='all'||x.event_id===eventId).forEach((x:Row)=>{const k=iso(x.day||x.spend_day||x.date||x.date_start);if(k)spend.set(k,(spend.get(k)||0)+Number(x.spend||0));});
   const days=Array.from(new Set([...sales.keys(),...content.keys(),...spend.keys()])).sort();
   if(!days.length)return <Card><h2>Chronologie de l’événement</h2><div className="empty"><p>Aucune donnée datée commune n’est encore disponible.</p><p className="helper">Les ventes, contenus et dépenses doivent retourner une date exploitable pour apparaître ici.</p></div></Card>;
   const max=Math.max(1,...days.map(x=>sales.get(x)||0));
