@@ -3,6 +3,7 @@ x-app: &app
   image: event-signal:local
   build: .
   secrets: [runtime_env]
+  # SHOTGUN_SMARTBOARD_TOKEN is loaded server-side from runtime_env by deploy/launch.mjs.
   init: true
   restart: unless-stopped
   depends_on:

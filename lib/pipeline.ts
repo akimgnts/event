@@ -1,4 +1,5 @@
 import {fetchSumup} from './connectors/sumup';
+import {syncShotgunTraffic} from './shotgun-traffic-sync';
 import {applyConfirmedLinks} from './confirmed-links';
 import {randomUUID,createHash} from 'node:crypto';
 import {session} from './db';
@@ -6,6 +7,7 @@ import {fetchShotgun,validateTicket} from './connectors/shotgun';
 import {fetchMeta,fetchInstagram} from './connectors/meta';
 import {getJSON,Row,pick} from './connectors/http';
 export async function runSync(provider:string,since='2026-10-01',until=new Date().toISOString().slice(0,10)) {
+ if(provider==='shotgun_traffic')return syncShotgunTraffic();
  const connection=await session();try{return await syncWithSession(connection.db,provider,since,until)}finally{connection.release()}
 }
 async function syncWithSession(db:Awaited<ReturnType<typeof session>>['db'],provider:string,since:string,until:string) {
