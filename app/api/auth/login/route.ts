@@ -1,11 +1,39 @@
 import {NextRequest,NextResponse} from 'next/server';
-import {session} from '@/lib/db';
+import {database,session} from '@/lib/db';
 import {allowedMutation} from '@/lib/mutation';
 import {hashPassword,checkPassword} from '@/lib/password';
 import {signToken,verifyToken} from '@/lib/session-token';
+import {signSubjectToken} from '@/lib/subject-token';
+import {authenticate} from '@/lib/users';
+
+const WEEK=7*86400000;
+function setSession(response:NextResponse,token:string){
+ response.headers.set('Cache-Control','no-store');
+ response.cookies.set('yeva_session',token,{httpOnly:true,secure:process.env.NODE_ENV==='production',sameSite:'strict',path:'/',maxAge:7*86400});
+ response.cookies.delete('yeva_setup');
+ return response;
+}
+
 export async function POST(req:NextRequest){
  if(!allowedMutation(req))return NextResponse.json({error:'Requête refusée'},{status:403});
  let body;try{body=await req.json()}catch{return NextResponse.json({error:'Requête invalide'},{status:400})}
+
+ // Connexion nominative. Elle sait qui se connecte : le jeton porte l'identifiant
+ // du compte, donc une publication ou une association confirmée a un auteur.
+ if(typeof body.email==='string'){
+  let result;
+  try{result=await authenticate(await database(),body.email,body.password)}
+  catch{return NextResponse.json({error:'Connexion indisponible'},{status:503})}
+  if(result.ok)return setSession(NextResponse.json({ok:true,user:result.user}),await signSubjectToken('session',result.user.id,Date.now()+WEEK));
+  // Un compte inconnu renvoie le même message qu'un mot de passe faux : on ne
+  // révèle pas quelles adresses existent.
+  if(result.reason==='throttled')return NextResponse.json({error:'Trop de tentatives. Réessaie dans 15 minutes.'},{status:429,headers:{'Cache-Control':'no-store'}});
+  if(result.reason==='disabled')return NextResponse.json({error:'Ce compte est désactivé.'},{status:403,headers:{'Cache-Control':'no-store'}});
+  return NextResponse.json({error:'Identifiants incorrects.'},{status:401,headers:{'Cache-Control':'no-store'}});
+ }
+
+ // Accès partagé historique (`silver.hub_access`) : conservé tant que la bascule
+ // vers les comptes nominatifs n'est pas terminée.
  const password=body.password;if(typeof password!=='string'||password.length<12||password.length>256)return NextResponse.json({error:'Utilise entre 12 et 256 caractères.'},{status:400});
  const conn=await session(),db=conn.db;let active=false;
  try{
@@ -22,7 +50,6 @@ export async function POST(req:NextRequest){
    await db.query('DELETE FROM silver.login_throttle WHERE id=1');
   }
   await db.query('COMMIT');active=false;
-  const r=NextResponse.json({ok:true});r.headers.set('Cache-Control','no-store');
-  r.cookies.set('yeva_session',await signToken('session',Date.now()+7*86400000),{httpOnly:true,secure:process.env.NODE_ENV==='production',sameSite:'strict',path:'/',maxAge:7*86400});r.cookies.delete('yeva_setup');return r;
+  return setSession(NextResponse.json({ok:true}),await signToken('session',Date.now()+WEEK));
  }catch{if(active)await db.query('ROLLBACK');return NextResponse.json({error:'Connexion indisponible'},{status:503})}finally{conn.release()}
 }
