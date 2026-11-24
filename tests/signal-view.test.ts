@@ -239,3 +239,96 @@ test('un budget qui s’épuise avant la date est signalé', () => {
   const v = buildSignalView(data(), { now: NOW, adBudget: 20 });
   assert.ok(v.alerts.some(a => a.code === 'budget_short'));
 });
+
+/* --- entonnoir --- */
+
+test('chaque étape de l’entonnoir nomme son fournisseur et garde son null', () => {
+  const v = buildSignalView(data(), { now: NOW });
+  assert.deepEqual(v.funnel.map(s => s.label), [
+    'Impressions', 'Clics sortants', 'Visites billetterie',
+    'Commandes', 'Billets payants', 'Billets scannés',
+  ]);
+  assert.equal(v.funnel[0].value, 4200);
+  assert.equal(v.funnel[0].provider, 'Meta');
+  assert.equal(v.funnel[2].value, 220);
+  assert.equal(v.funnel[5].value, 0, 'scanned vaut 0 dans la source, pas inconnu');
+});
+
+test('sans source publicitaire, les étapes Meta restent null et pas zéro', () => {
+  const d = data();
+  d.marketing = [];
+  d.ads = [];
+  const v = buildSignalView(d, { now: NOW });
+  assert.equal(v.funnel[0].value, null);
+  assert.equal(v.funnel[1].value, null);
+});
+
+/* --- bilan --- */
+
+test('la cascade retire les frais puis la publicité', () => {
+  const v = buildSignalView(data(), { now: NOW });
+  assert.equal(v.bilan.payout.faceValue, 42);
+  assert.equal(v.bilan.payout.netPayout, 36.6);
+  assert.equal(v.bilan.spend, 12.5);
+  assert.ok(Math.abs((v.bilan.afterAds ?? 0) - 24.1) < 1e-9);
+});
+
+test('le reste est inconnu si l’un des deux retraits l’est', () => {
+  const d = data();
+  d.marketing = [];
+  const v = buildSignalView(d, { now: NOW });
+  assert.equal(v.bilan.spend, null);
+  assert.equal(v.bilan.afterAds, null, 'pas de solde partiel traité comme complet');
+});
+
+test('la part des frais est calculée tarif par tarif', () => {
+  const d = data();
+  d.priceGroups = [
+    { event_id: 'E2', deal_title: 'Early', price_cents: 299, tickets: 5, face_value: 14.95, organizer_fees: 4.95 },
+    { event_id: 'E2', deal_title: 'Plein', price_cents: 599, tickets: 5, face_value: 29.95, organizer_fees: 4.95 },
+  ];
+  const v = buildSignalView(d, { now: NOW });
+  const [early, plein] = v.bilan.priceGroups;
+  assert.equal(early.title, 'Early', 'trié du moins cher au plus cher');
+  assert.ok(early.feeShare! > plein.feeShare!, 'le même frais pèse plus sur le petit prix');
+});
+
+test('les constats sont chiffrés et ne concluent rien', () => {
+  const v = buildSignalView(data(), { now: NOW });
+  const labels = v.bilan.findings.map(f => f.label);
+  assert.ok(labels.some(l => l.startsWith('Part des frais')));
+  assert.ok(labels.some(l => l.startsWith('Billets vendus dans les trois')));
+  assert.ok(labels.some(l => l.startsWith('Reste après')));
+});
+
+test('les billets des trois derniers jours se comptent depuis J-4', () => {
+  const v = buildSignalView(data(), { now: NOW });
+  const f = v.bilan.findings.find(x => x.label.startsWith('Billets vendus dans les trois'));
+  assert.equal(f?.value, '5 sur 10', 'seul le point J-3 tombe dans la fenêtre');
+});
+
+test('SumUp sans synchronisation réussie est déclaré non connecté', () => {
+  const v = buildSignalView(data(), { now: NOW });
+  assert.equal(v.bilan.sumup.connected, false);
+  assert.equal(v.bilan.sumup.gross, null, 'aucun montant inventé');
+});
+
+/* --- sources --- */
+
+test('les cinq connexions sont listées même sans aucune synchronisation', () => {
+  const v = buildSignalView(data(), { now: NOW });
+  assert.deepEqual(v.sources.connections.map(c => c.provider),
+    ['shotgun', 'meta', 'instagram', 'manychat', 'sumup']);
+  assert.equal(v.sources.connections[0].lastSuccess, null);
+});
+
+test('une tentative en erreur est rapportée avec son code, sans effacer le dernier succès', () => {
+  const d = data();
+  d.successful = [{ provider: 'shotgun', finished_at: '2026-11-18T09:00:00Z', row_count: 28 }];
+  d.runs = [{ provider: 'shotgun', status: 'error', error_code: 'token_expired' }];
+  const v = buildSignalView(d, { now: NOW });
+  const shotgun = v.sources.connections[0];
+  assert.equal(shotgun.lastStatus, 'error');
+  assert.equal(shotgun.errorCode, 'token_expired');
+  assert.equal(shotgun.rowCount, 28, 'le dernier relevé réussi reste affiché');
+});

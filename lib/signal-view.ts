@@ -107,6 +107,62 @@ export type AdsPanel = {
   currency: string;
 };
 
+/** Une étape de l'entonnoir. Chaque étape nomme son fournisseur : les étapes ne
+ *  viennent pas toutes de la même source et ne se déduisent pas l'une de l'autre. */
+export type FunnelStep = {
+  label: string;
+  value: number | null;
+  provider: string;
+  note: string;
+};
+
+export type PriceGroup = {
+  title: string;
+  priceEur: number | null;
+  tickets: number | null;
+  faceValue: number | null;
+  organizerFees: number | null;
+  userFees: number | null;
+  feeShare: number | null;
+};
+
+export type SumupSummary = {
+  connected: boolean;
+  transactions: number;
+  gross: number | null;
+  linked: number;
+};
+
+/** Constat chiffré, sans interprétation : chaque ligne est vérifiable. */
+export type Finding = { label: string; value: string; detail: string | null };
+
+export type BilanPanel = {
+  payout: NetPayout;
+  spend: number | null;
+  afterAds: number | null;
+  averagePrice: number | null;
+  scanned: number | null;
+  scanRate: number | null;
+  priceGroups: PriceGroup[];
+  sumup: SumupSummary;
+  findings: Finding[];
+  currency: string;
+};
+
+export type SourceState = {
+  provider: string;
+  label: string;
+  lastSuccess: string | null;
+  rowCount: number | null;
+  lastStatus: string | null;
+  errorCode: string | null;
+};
+
+export type SourcesPanel = {
+  connections: SourceState[];
+  credentials: { credential: string; status: string; expiresAt: string | null; checkedAt: string | null }[];
+};
+
 export type SignalView = {
   events: EventOption[];
   selectedId: string | null;
@@ -114,8 +170,11 @@ export type SignalView = {
   startsAt: string | null;
   traffic: TrafficState;
   today: TodayPanel;
+  funnel: FunnelStep[];
   timeline: TimelinePanel;
   ads: AdsPanel;
+  bilan: BilanPanel;
+  sources: SourcesPanel;
   alerts: Alert[];
   limitations: string[];
   budgetConfigured: boolean;
@@ -295,6 +354,133 @@ export function buildSignalView(data: Row, options: BuildOptions = {}): SignalVi
     currency,
   };
 
+  /* ---- entonnoir ----
+   * Les étapes viennent de deux fournisseurs différents et ne s'emboîtent pas
+   * logiquement : une impression n'est pas une personne, une visite n'est pas un
+   * clic retrouvé. L'entonnoir range des ordres de grandeur, il ne démontre
+   * aucun passage d'une étape à la suivante. */
+  const funnel: FunnelStep[] = [
+    { label: 'Impressions', value: num(marketing?.impressions), provider: 'Meta',
+      note: 'Affichages, pas des personnes.' },
+    { label: 'Clics sortants', value: outbound, provider: 'Meta',
+      note: 'Sorties vers la billetterie remontées par Meta.' },
+    { label: 'Visites billetterie', value: visits, provider: 'Shotgun',
+      note: 'Chaque passage compte, toutes origines confondues.' },
+    { label: 'Commandes', value: num(event?.orders), provider: 'Shotgun',
+      note: 'Une commande peut contenir plusieurs billets.' },
+    { label: 'Billets payants', value: paidTickets, provider: 'Shotgun',
+      note: 'Invitations et duplicatas exclus.' },
+    { label: 'Billets scannés', value: num(event?.scanned), provider: 'Shotgun',
+      note: 'Présence à l’entrée, si le scan a été utilisé.' },
+  ];
+
+  /* ---- écran Bilan ---- */
+  const afterAds =
+    payout.netPayout === null || legacy.spend === null ? null : payout.netPayout - legacy.spend;
+
+  const sumupRows = forEvent(data?.sumup);
+  const allSumup: Row[] = Array.isArray(data?.sumup) ? data.sumup : [];
+  const successful: Row[] = Array.isArray(data?.successful) ? data.successful : [];
+  const sumupGross = sumupRows.reduce<number | null>((total, r) => {
+    const v = num(r.amount);
+    return v === null ? total : (total ?? 0) + v;
+  }, null);
+
+  /**
+   * Billets vendus dans les trois derniers jours : total de la courbe moins le
+   * cumul atteint à J-4. Si la courbe ne remonte pas jusque-là, tout ce qu'elle
+   * contient est déjà dans la fenêtre.
+   */
+  const lastThreeDays = curve?.length
+    ? curve[curve.length - 1].cumulative - (cumulativeAt(curve, 4) ?? 0)
+    : null;
+
+  const findings: Finding[] = [];
+  const fmt = (v: number | null, unit = '') => (v === null ? '—' : `${v.toLocaleString('fr-FR', { maximumFractionDigits: 2 })}${unit}`);
+
+  if (payout.feeShare !== null) {
+    findings.push({
+      label: 'Part des frais dans le prix facial',
+      value: fmt(payout.feeShare * 100, ' %'),
+      detail: 'Frais quasi fixes par billet : leur poids augmente quand le prix baisse.',
+    });
+  }
+  if (lastThreeDays !== null && paidTickets) {
+    findings.push({
+      label: 'Billets vendus dans les trois derniers jours',
+      value: `${lastThreeDays} sur ${paidTickets}`,
+      detail: 'Concentration de la demande près de la date.',
+    });
+  }
+  const nearestComparable = comparisons.filter(c => c.comparable).slice(-1)[0];
+  if (nearestComparable) {
+    findings.push({
+      label: `Écart avec l’édition précédente au ${nearestComparable.daysBefore === 0 ? 'jour J' : `J-${nearestComparable.daysBefore}`}`,
+      value: `${nearestComparable.current} contre ${nearestComparable.previous}`,
+      detail: previous ? `Comparé à ${str(previous.name) ?? 'l’édition précédente'}.` : null,
+    });
+  }
+  if (afterAds !== null) {
+    findings.push({
+      label: 'Reste après frais de billetterie et publicité',
+      value: fmt(afterAds, ' €'),
+      detail: 'Hors encaissements sur place, frais de virement et dépenses du lieu.',
+    });
+  }
+
+  const bilan: BilanPanel = {
+    payout,
+    spend: legacy.spend,
+    afterAds,
+    averagePrice: legacy.averagePrice,
+    scanned: num(event?.scanned),
+    scanRate: ratio(event?.scanned, event?.valid_tickets),
+    priceGroups: priceGroups.map(g => ({
+      title: str(g.deal_title) ?? 'Tarif sans nom',
+      priceEur: num(g.price_cents) === null ? null : num(g.price_cents)! / 100,
+      tickets: num(g.tickets),
+      faceValue: num(g.face_value),
+      organizerFees: num(g.organizer_fees),
+      userFees: num(g.user_fees),
+      feeShare: ratio(g.organizer_fees, g.face_value),
+    })).sort((a, b) => (a.priceEur ?? 0) - (b.priceEur ?? 0)),
+    sumup: {
+      connected: successful.some(r => String(r.provider) === 'sumup'),
+      transactions: sumupRows.length,
+      gross: sumupGross,
+      linked: allSumup.filter(r => r.event_id).length,
+    },
+    findings,
+    currency,
+  };
+
+  /* ---- sources et fiabilité ---- */
+  const runs: Row[] = Array.isArray(data?.runs) ? data.runs : [];
+  const LABELS: Record<string, string> = {
+    shotgun: 'Shotgun', meta: 'Meta Ads', instagram: 'Instagram',
+    manychat: 'ManyChat', sumup: 'SumUp',
+  };
+  const sources: SourcesPanel = {
+    connections: Object.keys(LABELS).map(provider => {
+      const ok = successful.find(r => String(r.provider) === provider);
+      const attempt = runs.find(r => String(r.provider) === provider);
+      return {
+        provider,
+        label: LABELS[provider],
+        lastSuccess: str(ok?.finished_at),
+        rowCount: num(ok?.row_count),
+        lastStatus: str(attempt?.status),
+        errorCode: str(attempt?.error_code),
+      };
+    }),
+    credentials: (Array.isArray(data?.credentials) ? data.credentials : []).map((c: Row) => ({
+      credential: String(c.credential ?? ''),
+      status: str(c.status) ?? 'inconnu',
+      expiresAt: str(c.expires_at),
+      checkedAt: str(c.checked_at),
+    })),
+  };
+
   /* ---- bloc « À faire maintenant » ---- */
   const recent = media.filter(m => {
     const published = m.published_at ? Date.parse(String(m.published_at)) : NaN;
@@ -325,8 +511,11 @@ export function buildSignalView(data: Row, options: BuildOptions = {}): SignalVi
     startsAt: str(event?.starts_at),
     traffic,
     today,
+    funnel,
     timeline,
     ads: adsPanel,
+    bilan,
+    sources,
     alerts: alerts({
       trafficStatus: traffic.status,
       unlinkedRecentContent: recent,

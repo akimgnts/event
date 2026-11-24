@@ -15,12 +15,13 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { CurvePoint, SignalView } from '@/lib/signal-view';
 
-type Screen = 'today' | 'timeline' | 'ads';
+type Screen = 'today' | 'timeline' | 'ads' | 'bilan';
 
 const SCREENS: [Screen, string, string][] = [
   ['today', 'Aujourd’hui', 'Ce qui demande une décision maintenant.'],
   ['timeline', 'Chronologie', 'Comment les ventes sont arrivées, et à quoi les comparer.'],
   ['ads', 'Publicités', 'Où va le budget, et ce qui en revient.'],
+  ['bilan', 'Bilan', 'Ce que l’événement a rapporté, et ce qu’il en reste.'],
 ];
 
 const DASH = <span className="sg-dash">—</span>;
@@ -232,6 +233,51 @@ function TodayScreen({ view }: { view: SignalView }) {
   );
 }
 
+/**
+ * L'entonnoir sans barres.
+ *
+ * Les valeurs s'étalent sur trois ordres de grandeur : des impressions aux
+ * billets scannés, une barre à échelle commune écrase tout sauf la première, et
+ * une échelle logarithmique ferait croire à une proportion qui n'existe pas.
+ *
+ * Ce qui a du sens est le taux de passage, et seulement entre deux étapes du
+ * même fournisseur. Au passage de Meta à Shotgun, aucun taux n'est affiché :
+ * c'est précisément l'écart que l'écran Publicités mesure séparément.
+ */
+function Funnel({ steps }: { steps: SignalView['funnel'] }) {
+  return (
+    <div className="sg-funnel">
+      {steps.map((s, i) => {
+        const prev = i ? steps[i - 1] : null;
+        const sameProvider = prev?.provider === s.provider;
+        const rate =
+          sameProvider && prev && prev.value != null && s.value != null && prev.value > 0
+            ? s.value / prev.value
+            : null;
+        return (
+          <div className="sg-funnel-row" key={s.label}>
+            <span className="sg-funnel-step">
+              {prev ? (
+                rate !== null
+                  ? <em className="sg-funnel-rate">
+                      {/* Au-delà de 1, ce n'est plus un taux de passage mais un
+                          multiplicateur : une commande porte plusieurs billets. */}
+                      {rate > 1 ? <>×{n(rate, 2)}</> : pct(rate)}
+                    </em>
+                  : <em className="sg-funnel-rate sg-dash">
+                      {sameProvider ? 'non calculable' : 'changement de source'}
+                    </em>
+              ) : null}
+            </span>
+            <span className="sg-funnel-label">{s.label}<small>{s.provider} · {s.note}</small></span>
+            <strong className="sg-right">{n(s.value)}</strong>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function TimelineScreen({ view }: { view: SignalView }) {
   const tl = view.timeline;
   const auto = tl.automation;
@@ -239,6 +285,17 @@ function TimelineScreen({ view }: { view: SignalView }) {
   return (
     <>
       <Card>
+        <div className="sg-card-head"><h2>Entonnoir observé</h2></div>
+        <p className="sg-sub">
+          Deux fournisseurs, des définitions différentes. Un taux n’est affiché que
+          lorsque les deux étapes viennent de la même source : au passage de Meta à
+          Shotgun, rien ne garantit qu’un clic et une visite comptent la même chose.
+          C’est l’écart que mesure l’écran Publicités.
+        </p>
+        <Funnel steps={view.funnel} />
+      </Card>
+
+      <Card className="sg-stack">
         <div className="sg-card-head">
           <h2>Billets cumulés, alignés en J-x</h2>
           <span className="signal-chip">{tl.previousCurve ? 'Deux éditions' : 'Une seule édition'}</span>
@@ -504,6 +561,181 @@ function AdsScreen({ view }: { view: SignalView }) {
   );
 }
 
+function BilanScreen({ view }: { view: SignalView }) {
+  const b = view.bilan;
+  const c = b.currency;
+
+  /** Cascade : chaque ligne retire quelque chose de la précédente. */
+  const waterfall: [string, number | null, string][] = [
+    ['Prix facial encaissé', b.payout.faceValue, 'base'],
+    ['Frais organisateur', b.payout.organizerFees === null ? null : -b.payout.organizerFees, 'retrait'],
+    ['Versement net estimé', b.payout.netPayout, 'etape'],
+    ['Publicité', b.spend === null ? null : -b.spend, 'retrait'],
+    ['Reste', b.afterAds, 'solde'],
+  ];
+  const scale = Math.max(b.payout.faceValue ?? 1, 1);
+
+  return (
+    <>
+      <div className="sg-grid sg-grid--4">
+        <Tile label="Prix facial" value={eur(b.payout.faceValue, c)}
+          note={<>Billets valides, hors frais. Prix moyen {eur(b.averagePrice, c)}.</>} />
+        <Tile label="Versement net estimé" value={eur(b.payout.netPayout, c)}
+          note={<>Après {eur(b.payout.organizerFees, c)} de frais organisateur, soit {pct(b.payout.feeShare)} du facial.</>} />
+        <Tile label="Publicité" value={eur(b.spend, c)}
+          note={<>Uniquement les campagnes associées à cet événement.</>} />
+        <Tile label="Reste" value={eur(b.afterAds, c)}
+          note={<>Hors encaissements sur place, frais de virement et dépenses du lieu.</>} />
+      </div>
+
+      <Card className="sg-stack">
+        <div className="sg-card-head"><h2>Ce qui reste, ligne par ligne</h2></div>
+        <p className="sg-sub">
+          Deux retraits seulement sont connus de Signal : les frais de billetterie et la
+          publicité. Le cachet, le lieu, le matériel et les frais de virement n’y sont pas.
+          Ce n’est donc pas un résultat net.
+        </p>
+        <div className="sg-waterfall">
+          {waterfall.map(([label, value, kind]) => (
+            <div className={'sg-wf-row sg-wf--' + kind} key={label}>
+              <span>{label}</span>
+              <span className="sg-wf-track">
+                <i style={{ width: value == null ? 0 : `${Math.min(Math.abs(value) / scale * 100, 100)}%` }} />
+              </span>
+              <strong className="sg-right">{eur(value, c)}</strong>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      <Card className="sg-stack">
+        <div className="sg-card-head"><h2>Par tarif</h2></div>
+        <p className="sg-sub">
+          Les frais de billetterie sont presque fixes par billet : leur part grandit à
+          mesure que le prix baisse. C’est le coût direct d’une grille basse.
+        </p>
+        {b.priceGroups.length ? (
+          <div className="sg-table-wrap">
+            <table className="sg-table">
+              <thead>
+                <tr>
+                  <th>Tarif</th><th className="sg-right">Prix</th><th className="sg-right">Billets</th>
+                  <th className="sg-right">Prix facial</th><th className="sg-right">Frais organisateur</th>
+                  <th className="sg-right">Part des frais</th>
+                </tr>
+              </thead>
+              <tbody>
+                {b.priceGroups.map(g => (
+                  <tr key={g.title + g.priceEur}>
+                    <td>{g.title}</td>
+                    <td className="sg-right">{eur(g.priceEur, c)}</td>
+                    <td className="sg-right">{n(g.tickets)}</td>
+                    <td className="sg-right">{eur(g.faceValue, c)}</td>
+                    <td className="sg-right">{eur(g.organizerFees, c)}</td>
+                    <td className="sg-right">{pct(g.feeShare)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="sg-empty">Aucun billet payant synchronisé pour cet événement.</div>
+        )}
+      </Card>
+
+      <div className="sg-grid sg-grid--2 sg-stack">
+        <Card>
+          <div className="sg-card-head">
+            <h2>Encaissements sur place</h2>
+            <span className={'signal-chip ' + (b.sumup.connected ? 'signal-chip--good' : '')}>
+              {b.sumup.connected ? 'SumUp connecté' : 'SumUp non connecté'}
+            </span>
+          </div>
+          <p className="sg-sub">
+            Les encaissements restent séparés des billets Shotgun : un paiement peut couvrir
+            plusieurs entrées, ou une vente déjà enregistrée ailleurs. Aucun total combiné
+            avant rapprochement.
+          </p>
+          <div className="sg-kv">
+            <div><span>Transactions rattachées</span><strong>{n(b.sumup.transactions)}</strong></div>
+            <div><span>Montant brut rattaché</span><strong>{eur(b.sumup.gross, c)}</strong></div>
+            <div><span>Transactions rattachées, tous événements</span><strong>{n(b.sumup.linked)}</strong></div>
+          </div>
+        </Card>
+        <Card>
+          <div className="sg-card-head"><h2>Présence à l’entrée</h2></div>
+          <p className="sg-sub">
+            Le scan n’est fiable que s’il a été utilisé toute la soirée. Un taux bas peut
+            signifier des absents comme un contrôle abandonné à la porte.
+          </p>
+          <div className="sg-kv">
+            <div><span>Billets scannés</span><strong>{n(b.scanned)}</strong></div>
+            <div><span>Part des billets valides</span><strong>{pct(b.scanRate)}</strong></div>
+          </div>
+        </Card>
+      </div>
+
+      <Card className="sg-stack">
+        <div className="sg-card-head"><h2>Ce que les chiffres disent</h2></div>
+        <p className="sg-sub">
+          Constats calculés sur cet événement, pas des leçons écrites d’avance.
+          Aucun n’affirme de cause.
+        </p>
+        {b.findings.length ? (
+          <div className="sg-kv">
+            {b.findings.map(f => (
+              <div key={f.label}>
+                <span>{f.label}{f.detail ? <small className="sg-sub"> {f.detail}</small> : null}</span>
+                <strong>{f.value}</strong>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="sg-empty">Pas assez de données pour un constat vérifiable.</div>
+        )}
+      </Card>
+    </>
+  );
+}
+
+function SourcesFooter({ sources }: { sources: SignalView['sources'] }) {
+  const broken = sources.connections.filter(c => c.lastStatus === 'error').length;
+  return (
+    <details className="sg-sources">
+      <summary>
+        Sources et fiabilité
+        {broken ? <span className="signal-chip signal-chip--warning">{broken} en erreur</span> : null}
+      </summary>
+      <div className="sg-grid sg-grid--2 sg-stack">
+        <div>
+          <h3 className="sg-sources-head">Connexions</h3>
+          {sources.connections.map(c => (
+            <div className="sg-kv" key={c.provider}>
+              <div>
+                <span>{c.label}<small className="sg-sub"> dernier succès : {clock(c.lastSuccess)}
+                  {c.lastStatus === 'error' ? ` · dernière tentative en erreur (${c.errorCode ?? 'sans code'})` : ''}</small></span>
+                <strong>{c.rowCount == null ? DASH : <>{n(c.rowCount)} lignes</>}</strong>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div>
+          <h3 className="sg-sources-head">Validité des accès</h3>
+          {sources.credentials.length ? sources.credentials.map(c => (
+            <div className="sg-kv" key={c.credential}>
+              <div>
+                <span>{c.credential}<small className="sg-sub"> contrôle : {clock(c.checkedAt)}
+                  {c.expiresAt ? ` · expiration : ${clock(c.expiresAt)}` : ''}</small></span>
+                <strong>{c.status}</strong>
+              </div>
+            </div>
+          )) : <p className="sg-sub">Aucun contrôle d’accès enregistré.</p>}
+        </div>
+      </div>
+    </details>
+  );
+}
+
 /* ------------------------------------------------------------------ *
  * Coque
  * ------------------------------------------------------------------ */
@@ -579,8 +811,10 @@ export default function SignalApp({ view }: { view: SignalView }) {
           {screen === 'today' ? <TodayScreen view={view} /> : null}
           {screen === 'timeline' ? <TimelineScreen view={view} /> : null}
           {screen === 'ads' ? <AdsScreen view={view} /> : null}
+          {screen === 'bilan' ? <BilanScreen view={view} /> : null}
 
           <div className="sg-foot">
+            <SourcesFooter sources={view.sources} />
             Limites connues, affichées avec les chiffres plutôt qu’à côté :
             <ul>{view.limitations.map(l => <li key={l}>{l}</li>)}</ul>
           </div>
