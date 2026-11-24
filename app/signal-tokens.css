@@ -1,0 +1,181 @@
+/**
+ * Signal — jetons de design.
+ *
+ * Palette : bleu nuit structurant, violet de marque, orange rare.
+ * L'orange ne signale que ce qui demande une action. S'il apparaît trois fois
+ * sur un écran, il ne veut plus rien dire.
+ *
+ * Les trois couleurs de série ont été validées en clair et en sombre :
+ * bande de luminosité, plancher de chroma, séparation deutan/protan/tritan,
+ * contraste sur surface. Trois séries au maximum — toute quatrième couleur
+ * testée échoue sur la séparation daltonisme ou vire au gris.
+ * L'ordre est fixe et jamais recyclé : une couleur suit l'entité, pas son rang.
+ */
+
+:root {
+  /* surfaces et texte */
+  --signal-bg: #F7F8FB;
+  --signal-surface: #FFFFFF;
+  --signal-border: #E4E7EF;
+  --signal-ink: #141B34;
+  --signal-ink-2: #4A5370;
+  --signal-ink-3: #737D99;
+  --signal-hover: #F0F2F7;
+
+  /* marque et accent */
+  --signal-brand: #6E56CF;
+  --signal-brand-soft: #EFEDFB;
+  --signal-accent: #D2691E;
+  --signal-accent-soft: #FBF0E6;
+
+  /* séries de données — ordre fixe */
+  --signal-serie-1: #6E56CF; /* ventes */
+  --signal-serie-2: #D2691E; /* dépense publicitaire */
+  --signal-serie-3: #0E9F9F; /* contenus */
+  --signal-serie-muted: #C9CEDC; /* comparaison, édition précédente */
+
+  /* statut — réservé, jamais réutilisé comme couleur de série */
+  --signal-good: #1A7F5A;
+  --signal-warning: #B4690E;
+  --signal-critical: #B42318;
+  --signal-unknown: #737D99;
+
+  /* échelle d'espacement, stricte */
+  --signal-space-1: 4px;
+  --signal-space-2: 8px;
+  --signal-space-3: 12px;
+  --signal-space-4: 16px;
+  --signal-space-5: 20px;
+  --signal-space-6: 24px;
+  --signal-space-8: 32px;
+  --signal-space-12: 48px;
+
+  /* rayons */
+  --signal-radius-sm: 8px;
+  --signal-radius: 10px;
+  --signal-radius-lg: 12px;
+
+  /* typographie */
+  --signal-font: Inter, system-ui, -apple-system, sans-serif;
+  --signal-font-brand: Poppins, var(--signal-font);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --signal-bg: #0F1424;
+    --signal-surface: #161C30;
+    --signal-border: #263048;
+    --signal-ink: #EEF1F8;
+    --signal-ink-2: #A8B2CA;
+    --signal-ink-3: #78839E;
+    --signal-hover: #1D2439;
+
+    --signal-brand: #8B74E8;
+    --signal-brand-soft: #241F3F;
+    --signal-accent: #E0893F;
+    --signal-accent-soft: #33240F;
+
+    --signal-serie-1: #8B74E8;
+    --signal-serie-2: #E0893F;
+    --signal-serie-3: #2FB5B5;
+    --signal-serie-muted: #3A4460;
+  }
+}
+
+:root[data-theme='dark'] {
+  --signal-bg: #0F1424;
+  --signal-surface: #161C30;
+  --signal-border: #263048;
+  --signal-ink: #EEF1F8;
+  --signal-ink-2: #A8B2CA;
+  --signal-ink-3: #78839E;
+  --signal-hover: #1D2439;
+
+  --signal-brand: #8B74E8;
+  --signal-brand-soft: #241F3F;
+  --signal-accent: #E0893F;
+  --signal-accent-soft: #33240F;
+
+  --signal-serie-1: #8B74E8;
+  --signal-serie-2: #E0893F;
+  --signal-serie-3: #2FB5B5;
+  --signal-serie-muted: #3A4460;
+}
+
+/* Tout chiffre présenté en colonne doit s'aligner. */
+.signal-num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- boutons : trois niveaux, pas plus ---- */
+.signal-btn {
+  height: 36px;
+  border-radius: var(--signal-radius-sm);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 550;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 14px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background-color 120ms, border-color 120ms, color 120ms;
+}
+.signal-btn:focus-visible {
+  outline: 2px solid var(--signal-brand);
+  outline-offset: 2px;
+}
+.signal-btn[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Un seul bouton primaire par écran. */
+.signal-btn--primary {
+  background: var(--signal-ink);
+  color: var(--signal-surface);
+}
+.signal-btn--primary:hover:not([disabled]) {
+  background: #1E2748;
+}
+
+.signal-btn--secondary {
+  background: var(--signal-surface);
+  border-color: var(--signal-border);
+  color: var(--signal-ink);
+}
+.signal-btn--secondary:hover:not([disabled]) {
+  background: var(--signal-hover);
+}
+
+.signal-btn--ghost {
+  background: transparent;
+  color: var(--signal-ink-2);
+  padding: 0 10px;
+}
+.signal-btn--ghost:hover:not([disabled]) {
+  background: var(--signal-hover);
+}
+
+/* ---- cartes : bordure, jamais d'ombre ---- */
+.signal-card {
+  background: var(--signal-surface);
+  border: 1px solid var(--signal-border);
+  border-radius: var(--signal-radius);
+  padding: var(--signal-space-5);
+}
+
+/* ---- statut ---- */
+.signal-chip {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: var(--signal-hover);
+  color: var(--signal-ink-2);
+  white-space: nowrap;
+}
+.signal-chip--good { background: #E7F3EE; color: var(--signal-good); }
+.signal-chip--warning { background: var(--signal-accent-soft); color: var(--signal-warning); }
+.signal-chip--critical { background: #FDECEA; color: var(--signal-critical); }
