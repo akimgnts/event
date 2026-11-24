@@ -464,10 +464,14 @@ export function alerts(input: {
   }
 
   if (input.unlinkedRecentContent && input.unlinkedRecentContent > 0) {
+    const count = input.unlinkedRecentContent;
     out.push({
       code: 'content_unlinked',
       severity: 'info',
-      message: `${input.unlinkedRecentContent} publication(s) récente(s) ne sont rattachées à aucun événement.`,
+      message:
+        count > 1
+          ? `${count} publications récentes ne sont rattachées à aucun événement.`
+          : 'Une publication récente n’est rattachée à aucun événement.',
       detail: null,
     });
   }
